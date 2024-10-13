@@ -32,8 +32,9 @@ By simplifying the task-tracking process, Memo-ry helps individuals maintain the
   -Sign up for an API key at [Cerebras]([url](https://cloud.cerebras.ai/)).
   -Replace the API key in the code:
    In the extractTasks function in index.html, find this line:
-      ```const token = 'YOUR_API_KEY';  // Replace with your actual API key
-   Replace 'YOUR_API_KEY' with your actual API key.
+      ```
+      const token = 'YOUR_API_KEY';  // Replace with your actual API key
+Replace 'YOUR_API_KEY' with your actual API key.
 
 
 ### Usage
