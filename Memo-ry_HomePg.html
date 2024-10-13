@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memo-ry: Empowering Independence for People with Dementia</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f7f6;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    h2 {
+      color: #555;
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+    }
+
+    #start-btn, #stop-btn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    #start-btn:hover, #stop-btn:hover {
+      background-color: #45a049;
+    }
+
+    #start-btn:disabled, #stop-btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    div {
+      margin-top: 20px;
+      width: 80%;
+      max-width: 1000px;
+      text-align: left;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    p {
+      font-size: 1.2rem;
+      background-color: transparent;
+      color: #333;
+      min-height: 50px;
+      line-height: 1.6;
+      border: none;
+    }
+
+    #transcription {
+      background-color: #f9f9f9;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+
+    #tasks {
+      background-color: #f1f8f6;
+      color: #2e7d32;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+
+    #description {
+      margin-bottom: 20px;
+      font-size: 1.2rem;
+      color: #444;
+      text-align: center;
+      max-width: 1000px;
+      line-height: 1.6;
+      margin-left: auto;
+      margin-right: auto;
+      background-color: transparent;
+    }
+
+    #button-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    button:focus {
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Memo-ry: Empowering Independence for People with Dementia</h1>
+
+  <p id="description">
+    Memo-ry is an innovative app designed to support individuals with dementia by recording and processing audio from daily conversations. It listens for tasks, demands, or instructions given to the person, then automatically generates an organized to-do list based on the recognized tasks. By simplifying the task-tracking process, Memo-ry helps individuals maintain their independence, reducing confusion and making it easier to manage day-to-day responsibilities.
+  </p>
+  
+  
+  <div id="button-container">
+    <button id="start-btn">Start Recording</button>
+    <button id="stop-btn" disabled>Stop Recording</button>
+  </div>
+  
+  <div>
+    <h2>Transcription:</h2>
+    <p id="transcription"></p>
+  </div>
+
+  <div>
+    <h2>Extracted Tasks:</h2>
+    <ul id="tasks"></ul> 
+  </div>
+
+  <script type="text/javascript">
+    // Speech-to-text setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const transcriptionElement = document.getElementById('transcription');
+    const tasksElement = document.getElementById('tasks'); 
+
+    let fullTranscription = '';
+    let taskCounter = 1; // Counter for numbering tasks sequentially
+
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            fullTranscription += transcript + ' ';
+            transcriptionElement.innerHTML = fullTranscription;
+
+            // Extract tasks after each final transcription
+            extractTasks(transcript);
+          }
+        }
+      };
+
+      startBtn.addEventListener('click', () => {
+        recognition.start();
+        startBtn.disabled = true; // Disable the start button when recording starts
+        stopBtn.disabled = false; // Enable the stop button
+      });
+
+      stopBtn.addEventListener('click', () => {
+        recognition.stop();
+        startBtn.disabled = false; // Re-enable the start button when recording stops
+        stopBtn.disabled = true;  // Disable the stop button
+      });
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+      };
+      
+    } else {
+      alert("Sorry, your browser doesn't support speech recognition.");
+    }
+
+    function extractTasks(transcription) {
+      const url = 'https://api.cerebras.ai/v1/chat/completions';
+      const token = 'API KEY'; // Replace with your API key
+
+      const requestData = {
+        model: "llama3.1-8b", 
+        stream: false,
+        messages: [
+          {
+            content: `Extract tasks from the following text: ${transcription}`,
+            role: "user"
+          }
+        ],
+        temperature: 0,
+        max_tokens: -1,
+        seed: 0,
+        top_p: 1
+      };
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.choices && data.choices.length > 0) {
+          const newTasks = data.choices[0].message.content;
+
+          // Extract only lines starting with numbers and remove irrelevant text
+          const numberedTasks = newTasks.split('\n').filter(line => /^\d+\.\s/.test(line));
+
+          // Add tasks as list items with checkboxes
+          numberedTasks.forEach(task => {
+            const li = document.createElement('li');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+
+            // Add event listener to mark the task as complete
+            checkbox.addEventListener('change', () => {
+              if (checkbox.checked) {
+                li.style.textDecoration = 'line-through';
+              } else {
+                li.style.textDecoration = 'none';
+              }
+            });
+
+            li.appendChild(checkbox);
+            li.appendChild(document.createTextNode(` ${taskCounter}. ${task.replace(/^\d+\.\s/, '')}`));
+            tasksElement.appendChild(li);
+            taskCounter++; // Increment task counter
+          });
+          
+        } else {
+          console.error('Unexpected response format:', data);
+          tasksElement.innerHTML = 'No tasks could be extracted from the transcription.';
+        }
+      })
+      .catch(error => {
+        console.error('Error during task extraction:', error);
+        tasksElement.innerHTML = 'An error occurred while extracting tasks.';
+      });
+    }
+
+  </script>
+</body>
+</html>
